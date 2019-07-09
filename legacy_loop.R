@@ -1,47 +1,55 @@
 #mean npp-map spatial model across veg types
-mean_production<-aggregate(npp.x~ x + y,mean,data=rangeland_npp_covariates_deviations_1)
-head(mean_production)
-list.coefficients.mean<-list()
+
+list.aic.lag<-list()
+list.aic.nolag<-list()
+
 for(i in 1:1000)
 {
   test.strat.northern_mixed<-stratified(northern_mixed_prairies_above_below, c("map"), 0.01)
-  #test.strat.cold_deserts<-stratified(cold_deserts_above_below, c("map"), 0.01)
-  #test.strat.california_annuals<-stratified(california_annuals_above_below, c("map"), 0.05)
-  #test.strat.semiarid_steppe<-stratified(semiarid_steppe_above_below, c("map"), 0.02)
-  #test.strat.hot_deserts<-stratified(hot_deserts_above_below, c("map"), 0.02)
-  #test.strat<-rbind(test.strat.northern_mixed, test.strat.cold_deserts, test.strat.california_annuals, 
-                    #test.strat.semiarid_steppe, test.strat.hot_deserts)
+  test.strat.cold_deserts<-stratified(cold_deserts_above_below, c("map"), 0.01)
+  test.strat.california_annuals<-stratified(california_annuals_above_below, c("map"), 0.05)
+  test.strat.semiarid_steppe<-stratified(semiarid_steppe_above_below, c("map"), 0.02)
+  test.strat.hot_deserts<-stratified(hot_deserts_above_below, c("map"), 0.02)
+  test.strat<-rbind(test.strat.northern_mixed, test.strat.cold_deserts, test.strat.california_annuals, 
+                    test.strat.semiarid_steppe, test.strat.hot_deserts)
+  stratified_final_mean<-merge(test.strat, lag_conus,by=c('x','y'))
   
-  stratified_final_mean<-merge(test.strat.northern_mixed, lag_conus_2,by=c('x','y'))
-  #print(stratified_final)
-  head(stratified_final_mean)
-  stratified_final_lm_mean_lag<-lm(npp.x~mm.x*prev
-                               ,stratified_final_mean)
-  AIC(stratified_final_lm_mean_lag)
-  summary(stratified_final_lm_mean_lag)
-  stratified_final_lm_mean<-lm(npp.x~mm.x
-                                   ,stratified_final_mean)
-  AIC(stratified_final_lm_mean)
-  summary(stratified_final_lm_mean)
-  
-  newcoef1 <- stratified_final_lm_mean$coefficients 
-  df.mean<-data.frame(newcoef1)
-  df.mean$id = i
-  list.coefficients.mean[[i]] <- data.frame(df.mean)
-  
-  
+  #no lag
+  df.nolag<- stratified_final_mean %>% group_by(region) %>%
+    dplyr::do(test.lm = lm(npp.std ~ mm.std, data = .)) %>%
+    dplyr::mutate(AIC=AIC(test.lm))
+    df.nolag_2<-df.nolag[-2]
+    list.aic.nolag[[i]]<-data.frame(df.nolag_2)
+    
+    #lag
+    df.lag<- stratified_final_mean %>% group_by(region) %>%
+      dplyr::do(test.lm.lag = lm(npp.std ~ mm.std*prev, data = .)) %>%
+      dplyr::mutate(AIC=AIC(test.lm.lag)) %>%
+      dplyr::mutate(mm.coef=coef(test.lm.lag)[2]) %>%
+      dplyr::mutate(prev.coef=coef(test.lm.lag)[3]) %>%
+      dplyr::mutate(interaction.coef=coef(test.lm.lag)[4])
+      df.lag_2<-df.lag[-2]
+      list.aic.lag[[i]]<-data.frame(df.lag_2)
+
 }
 
-summary(stratified_final_lm_mean)
-df.coefficients.mean <- do.call("rbind", list.coefficients.mean)
-head(df.coefficients.mean)
-df.coefficients.mean.2 <- cbind(rownames(df.coefficients.mean), data.frame(df.coefficients.mean, row.names=NULL))
+  
+coef_nolag <- do.call("rbind", list.aic.nolag)
+head(coef_nolag)
+coef_nolag.2 <- cbind(rownames(coef_nolag), data.frame(coef_nolag, row.names=NULL))
+head(coef_nolag.2)
+colnames(coef_nolag.2) <- c("id","region","AIC.nolag")
+head(coef_nolag.2)
 
-colnames(df.coefficients.mean.2)  <- c("predictor","coefficient","run.id")
+coef_lag <- do.call("rbind", list.aic.lag)
+head(coef_lag)
+coef_lag.2 <- cbind(rownames(coef_lag), data.frame(coef_lag, row.names=NULL))
+head(coef_lag.2)
+colnames(coef_lag.2) <- c("id","region","AIC.lag",'mm.coef','prev.year.coef','interaction')
+head(coef_lag.2)
 
-df.coefficients.mean.2$predictor<-gsub('[[:digit:]]+', '', df.coefficients.mean.2$predictor)
-df.coefficients.mean.2$predictor<-gsub(':', '_', df.coefficients.mean.2$predictor)
-df.coefficients.mean.2$predictor<-gsub('-', '_', df.coefficients.mean.2$predictor)
+merge.lags<-merge(coef_nolag.2,coef_lag.2,by=c('id','region'))
+head(merge.lags)
 
-df2_mean<-reshape(df.coefficients.mean.2, idvar = "run.id", timevar = "predictor", direction = "wide")
-head(df2_mean)
+merge.lags$aic.diff <- merge.lags$AIC.lag - merge.lags$AIC.nolag 
+hist(merge.lags$prev.year.coef)

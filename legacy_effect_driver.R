@@ -12,7 +12,7 @@ test_wd<-"G:/My Drive/range-resilience/Sensitivity/CONUS_rangelands_NPP_Sensitiv
 rangeland_npp_covariates<-readRDS(file.path(test_wd, "npp_climate_rangelands_final.rds")) #loads file and name it annualSWA_OctDec I guess
 as.data.frame(rangeland_npp_covariates)
 summary(rangeland_npp_covariates)
-
+head(rangeland_npp_covariates)
 
 #small touch up to get rid of the dash in the 'semi-arid_steppe'
 rangeland_npp_covariates$region<-gsub('-', '_', rangeland_npp_covariates$region)
@@ -86,16 +86,15 @@ head(rangeland_npp_covariates_deviations_1)
 #add percent mm and percent npp deviations to relatavize
 rangeland_npp_covariates_deviations_1$npp.dev<-rangeland_npp_covariates_deviations_1$npp.x - rangeland_npp_covariates_deviations_1$npp.y
 rangeland_npp_covariates_deviations_1$mm.dev<-rangeland_npp_covariates_deviations_1$mm.x - rangeland_npp_covariates_deviations_1$mm.y
+
 summary(rangeland_npp_covariates_deviations_1)
 head(rangeland_npp_covariates_deviations_1)
-
+rangeland_npp_covariates_deviations_2<- rangeland_npp_covariates_deviations_1[ -c(7:11) ]
+head(rangeland_npp_covariates_deviations_2)
 #add a lag term
 lag_conus <- rangeland_npp_covariates_deviations_1 %>% group_by(x, y) %>%
-  dplyr::mutate(prev = lag(npp.x))
+  dplyr::mutate(prev = lag(npp.x,n=1L,order_by=year,default = NA))
 
-head(lag_conus)
-
-head(sensitivity_conus)
-lag_conus_2<- lag_conus[ -c(7:11) ] #isolate coefficient so only slope is graphed
-head(lag_conus_2)
-
+lag_conus$npp.std<-(lag_conus$npp.x - lag_conus$npp.y)/lag_conus$npp.y
+lag_conus$npp.std.prev<-(lag_conus$prev - lag_conus$npp.y)/lag_conus$npp.y
+lag_conus$mm.std<-(lag_conus$mm.x - lag_conus$mm.y)/lag_conus$mm.y
